@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Function to generate datasets with specified parameters
-# Make classification is used as it allows for greateer control
+# Make classification is used as it allows for greater control
 # over the dataset
 def generate_dataset(n_samples, n_features, n_classes, informative, redundant, weights,
                      separability, outliers, feature_type):
@@ -50,7 +50,8 @@ def generate_dataset(n_samples, n_features, n_classes, informative, redundant, w
 
 # A map defining the different parameters to be passed to the generate_dataset function
 # The key is the label that will be appended to the filename. Level refers to the Taguchi method levels.
-# I considered using nested maps for readability but the fact that this will only be used once doesn't justify their usage.
+# I considered using nested maps for readability but the fact that this will only be used once doesn't justify their
+# usage.
 datasetTypeMap = {
     # default dataset to avoid repetition. This is the baseline. Each other dataset will change one of
     # these values only.
@@ -78,7 +79,8 @@ datasetTypeMap = {
     "properties_level_1": [10, 2, 5, 5, [0.5, 0.5], "linear", "none", "continuous"],
     "properties_level_2": [10, 2, 5, 0, [0.5, 0.5], "linear", "none", "continuous"],
     "properties_level_3": [10, 2, 10, 0, [0.5, 0.5], "linear", "none", "continuous"], # this dataset is the same as
-    # the default but will be transformed to be sparse. This can't be achieved while generating. All datasets are dense by default.
+    # the default but will be transformed to be sparse. This can't be achieved while generating. All datasets are dense
+    # by default.
     }
 
 def main():
@@ -90,7 +92,7 @@ def main():
                                 separability = dataset_type[5], outliers = dataset_type[6], feature_type = dataset_type[7])
 
         # convert final dataset to be sparse. This can't be done during generation and therefore it must be transformed
-        if label == "properties_level_4":
+        if label == "properties_level_3":
             X = csr_matrix(X)
             # Append features
             df = pd.DataFrame(X.toarray(), columns=[f"feature_{i}" for i in range(X.shape[1])])
