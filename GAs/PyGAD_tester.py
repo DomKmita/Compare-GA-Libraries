@@ -1,11 +1,13 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pygad
 
 # Load dataset
-df = pd.read_csv("datasets/small_dataset_default_version.csv")
+dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
+df = pd.read_csv(dataset_path)
 y = df["target"].values
 X = df.drop("target", axis=1).values
 
@@ -25,6 +27,24 @@ num_parents_mating = 20
 sol_per_pop = 100
 num_genes = X_train.shape[1]
 mutation_probability = 0.08
+
+"""
+    Callback function to track average & max fitness per generation.
+    This is to replicate DEAPs stats functionality.
+"""
+
+# Store stats per generation
+stats_log = []
+def on_generation(ga_instance):
+    population_fitness = ga_instance.last_generation_fitness
+    avg_fitness = np.mean(population_fitness)
+    max_fitness = np.max(population_fitness)
+    nevals = len(population_fitness)  # Number of evaluations
+
+    stats_log.append({"gen": ga_instance.generations_completed, "nevals": nevals, "avg": avg_fitness, "max": max_fitness})
+
+    print(f"{ga_instance.generations_completed:<3}{nevals:<9}{avg_fitness:<10.6f}{max_fitness:<10.6f}")
+
 
 '''
 *** From Docs: PyGAD has the following modules:
@@ -63,18 +83,22 @@ ga_instance = pygad.GA(
     # two-points, uniform and scattered.
     parent_selection_type="sss", # steady-state selection. Most equivalent to DEAP's selBest.
     keep_parents=1, # simpler than DEAP, you must handle keeping parents manually in DEAP. Must ensure that is the case.
+    on_generation=on_generation,
 )
 
-# Run the GA
-ga_instance.run()
+def run_ga():
+    # Run the GA
+    ga_instance.run()
 
-# Get the best solution
-best_solution, best_solution_fitness, _ = ga_instance.best_solution()
+    # Get the best solution
+    best_solution, best_solution_fitness, _ = ga_instance.best_solution()
 
-# Test the model on unseen data
-predictions_test = np.dot(X_test, best_solution) > 0
-predictions_test = predictions_test.astype(int)
-test_accuracy = accuracy_score(y_test, predictions_test)
+    # Test the model on unseen data
+    predictions_test = np.dot(X_test, best_solution) > 0
+    predictions_test = predictions_test.astype(int)
+    test_accuracy = accuracy_score(y_test, predictions_test)
 
-print("Best Weights:", best_solution)
-print("Test Accuracy:", test_accuracy)
+    print("Best Weights:", best_solution)
+    print("Test Accuracy:", test_accuracy)
+
+    return best_solution, test_accuracy
