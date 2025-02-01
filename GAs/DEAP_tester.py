@@ -103,9 +103,10 @@ toolbox.register("evaluate", fitness_function)
         1. I use the correct crossover for the type of algorithm I am using to avoid unwanted behaviour
         2. Create copies of individuals if I want to retain the individual.
         
-    Currently using basic cxBlend as per documentation example. Will test variety.
+    Changed from cxBlend to cxOnePoint for simplicity and consistency between PyGAD implementation that currently also
+    uses single-point crossover. PyGAD does not have a cxBlend varient.
 """
-toolbox.register("mate", tools.cxBlend, alpha=0.5)  # Crossover
+toolbox.register("mate", tools.cxOnePoint)  # Crossover
 
 """
 *** From Docs: There is a variety of mutation operators in the deap.tools module. Each mutation has its own 
@@ -119,9 +120,11 @@ toolbox.register("mate", tools.cxBlend, alpha=0.5)  # Crossover
         1. I use the correct mutation for the type of algorithm I am using to avoid unwanted behaviour
         2. Create copies of individuals if I want to retain the individual.
         
-    Currently using simple Gaussian mutation as per documentation example. Will test variety.
+    Changing mutation to inversion mutation as PyGAD offers that also.
 """
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1.0, indpb=0.2)  # Mutation
+toolbox.register("mutate", tools.mutInversion)  # Current PyGAD implementation uses
+# Inversion mutation possible options here are: Inversion, FlipBit, UniformInt, ShuffleIndexes, ESLogNormal,
+# PolynomialBounded mutGaussian
 
 """
 *** From Docs: Selection is made among a population by the selection operators that are available in the deap.tools 
@@ -137,9 +140,9 @@ toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1.0, indpb=0.2)  # Mut
     modified. Only a reference to the individual is copied. Just like every other operator it selects and only selects.  
     ***
 
-    Using basic "select best" crossover as per documentation example. Will test variety.
+    Updated to use tournament selection, this way both DEAP and PyGAD will behave more similarly.
 """
-toolbox.register("select", tools.selBest)  # Selection
+toolbox.register("select", tools.selTournament, tournsize=3)  # Selection
 
 # Run the genetic algorithm
 def run_ga():
@@ -162,6 +165,17 @@ def run_ga():
 
     # Run the GA (using DEAP eaSimple, their basic GA option)
     # logbook is where the statistics are stored.
+
+    """
+    These are the following algorithms provided. (Note: The DEAP Team encourage users to write their own for their 
+    specific use case.):    eaSimple
+                            varOr
+                            varAnd
+                            eaMuPlusLambda
+                            eaGenerateUpdate
+                            eaMuCommaLambda
+
+    """
     population, logbook = algorithms.eaSimple(
         population,
         toolbox,

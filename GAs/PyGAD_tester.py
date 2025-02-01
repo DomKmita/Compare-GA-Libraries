@@ -23,7 +23,7 @@ def fitness_function(ga_instance, solution, solution_idx):
 
 # GA parameters
 num_generations = 50
-num_parents_mating = 20
+num_parents_mating = 15
 sol_per_pop = 100
 num_genes = X_train.shape[1]
 mutation_probability = 0.08
@@ -75,14 +75,15 @@ ga_instance = pygad.GA(
     num_genes=num_genes,
     init_range_low=-1.0,
     init_range_high=1.0,
-    mutation_percent_genes=int(mutation_probability * 100),
+    mutation_probability=mutation_probability,
     crossover_probability=0.7,
-    mutation_type="random", # Current DEAP implementation uses Gaussian mutation. Possible options here are: random,
+    mutation_type="inversion", # Current DEAP implementation uses Inversion mutation. Possible options here are: random,
     # swap, inversion, scramble and adaptive.
     crossover_type="single_point", # Current DEAP implementation uses cxBlend. Possible options here are: single-point,
     # two-points, uniform and scattered.
-    parent_selection_type="sss", # steady-state selection. Most equivalent to DEAP's selBest.
-    keep_parents=1, # simpler than DEAP, you must handle keeping parents manually in DEAP. Must ensure that is the case.
+    parent_selection_type="tournament", # Changed to tournament as this way I can better control the behaviour of both
+    # libraries
+    K_tournament=3,
     on_generation=on_generation,
 )
 
