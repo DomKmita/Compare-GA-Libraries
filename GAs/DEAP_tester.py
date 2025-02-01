@@ -1,11 +1,13 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from deap import base, creator, tools, algorithms
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
 # Load dataset
-df = pd.read_csv("datasets/small_dataset_default_version.csv")
+dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
+df = pd.read_csv(dataset_path)
 y = df["target"].values
 X = df.drop("target", axis=1).values
 
@@ -172,15 +174,13 @@ def run_ga():
 
     # Get the best individual
     best_ind = tools.selBest(population, k=1)[0]
-    return best_ind, logbook
 
-# Run GA
-best_weights, log = run_ga()
+    # Test the model on unseen data
+    predictions_test = np.dot(X_test, best_ind) > 0
+    predictions_test = predictions_test.astype(int)
+    test_accuracy = accuracy_score(y_test, predictions_test)
 
-# Test the model on unseen data
-predictions_test = np.dot(X_test, best_weights) > 0
-predictions_test = predictions_test.astype(int)
-test_accuracy = accuracy_score(y_test, predictions_test)
+    print("Best Weights:", best_ind)
+    print("Test Accuracy:", test_accuracy)
 
-print("Best Weights:", best_weights)
-print("Test Accuracy:", test_accuracy)
+    return best_ind, test_accuracy
