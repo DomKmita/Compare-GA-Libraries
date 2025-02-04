@@ -188,6 +188,11 @@ def run_ga():
 
     # Get the best individual
     best_ind = tools.selBest(population, k=1)[0]
+    deap_stats = list(logbook)
+    deap_df = pd.DataFrame(deap_stats)
+
+    output_dir = Path(__file__).resolve().parent.parent / "usage_data"
+    deap_df.to_csv(output_dir / "deap_stats_log.csv", index=False)
 
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_ind) > 0
