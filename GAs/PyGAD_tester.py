@@ -94,6 +94,10 @@ def run_ga():
     # Get the best solution
     best_solution, best_solution_fitness, _ = ga_instance.best_solution()
 
+    pygad_df = pd.DataFrame(stats_log)
+    output_dir = Path(__file__).resolve().parent.parent / "usage_data"
+    pygad_df.to_csv(output_dir / "pygad_stats_log.csv", index=False)
+
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_solution) > 0
     predictions_test = predictions_test.astype(int)

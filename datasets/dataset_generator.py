@@ -83,7 +83,7 @@ datasetTypeMap = {
     # by default.
     }
 
-def main():
+def generate_datasets():
     for label, dataset_type in datasetTypeMap.items():
         # keeping sample size static for now. Once data is analysed I'll see what data properties to test for at larger
         # dataset sizes
@@ -105,6 +105,3 @@ def main():
         # Save to CSV
         df.to_csv(f"small_dataset_{label}.csv", index=False)
         print(f"Dataset_{label} saved as small_dataset_{label}.csv")
-
-if __name__ == "__main__":
-    main()
