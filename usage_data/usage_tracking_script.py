@@ -4,28 +4,36 @@ import pstats
 import io
 import pandas as pd
 from memory_profiler import memory_usage
+from utils.logger import logger
 
 from GAs import DEAP_tester
 from GAs import PyGAD_tester
 
 def profile(GA_run_callback, label):
     # Start logging cpu profile, runtime and memory usage
-    mem_before = memory_usage()[0]
-    start_time = time.time()
-    profiler = cProfile.Profile()
-    profiler.enable()
+    try:
+        mem_before = memory_usage()[0]
+        start_time = time.time()
+        profiler = cProfile.Profile()
+        profiler.enable()
 
-    # Run GA
-    GA_run_callback()
+        # Run GA
+        GA_run_callback()
 
-    # End logging cpu profile, runtime and memory usage
-    profiler.disable()
-    end_time = time.time()
-    mem_after = memory_usage()[0]
+        # End logging cpu profile, runtime and memory usage
+        profiler.disable()
+        end_time = time.time()
+        mem_after = memory_usage()[0]
+    except Exception as e:
+        logger.error(f"Failed to gather profiling data for {label}: {e}")
+        return pd.DataFrame()
 
-    s = io.StringIO()
-    ps = pstats.Stats(profiler, stream=s).sort_stats(pstats.SortKey.CUMULATIVE)
-    ps.print_stats()
+    try:
+        s = io.StringIO()
+        ps = pstats.Stats(profiler, stream=s).sort_stats(pstats.SortKey.CUMULATIVE)
+        ps.print_stats()
+    except Exception as e:
+        logger.error(f"Failed to generate pstats from cpu profiling data for {label}: {e}")
 
     df = pd.DataFrame([{
         "Algorithm": label,
@@ -35,8 +43,11 @@ def profile(GA_run_callback, label):
 
     # Saving these to separate files as their format isn't suitable for a df and require additional parsing
     profile_filename = f"usage_data/{label}_cpu_profile.txt"
-    with open(profile_filename, "w") as f:
-        f.write(s.getvalue())
+    try:
+        with open(profile_filename, "w") as f:
+            f.write(s.getvalue())
+    except Exception as e:
+        logger.error(f"Could not write profile file to {profile_filename}: {e}")
 
     return df
 
