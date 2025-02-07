@@ -1,15 +1,21 @@
+import traceback
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from deap import base, creator, tools, algorithms
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from utils.logger import logger
 
 # Load dataset
 dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
-df = pd.read_csv(dataset_path)
-y = df["target"].values
-X = df.drop("target", axis=1).values
+try:
+    df = pd.read_csv(dataset_path)
+    y = df["target"].values
+    X = df.drop("target", axis=1).values
+except Exception as e:
+    logger.error(f"Failed to load dataset from {dataset_path}: {e}")
+    raise
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
@@ -84,11 +90,15 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
   me in the process.
 """
 def fitness_function(individual):
-    # Apply weights as a linear model
-    predictions = np.dot(X_train, individual) > 0
-    predictions = predictions.astype(int)
-    accuracy = accuracy_score(y_train, predictions)
-    return accuracy,
+    try:
+        # Apply weights as a linear model
+        predictions = np.dot(X_train, individual) > 0
+        predictions = predictions.astype(int)
+        accuracy = accuracy_score(y_train, predictions)
+        return accuracy,
+    except Exception as e:
+        logger.error(f"Failed to evaluate {individual}: {e}")
+        return np.nan,
 
 # Register fitness function with toolbox
 toolbox.register("evaluate", fitness_function)
@@ -176,23 +186,31 @@ def run_ga():
                             eaMuCommaLambda
 
     """
-    population, logbook = algorithms.eaSimple(
-        population,
-        toolbox,
-        cxpb=0.7,  # Crossover probability (Will play around with this)
-        mutpb=0.08,  # Mutation probability (Will play around with this)
-        ngen=n_generations,
-        stats=stats,
-        verbose=True,
-    )
+    try:
+        population, logbook = algorithms.eaSimple(
+            population,
+            toolbox,
+            cxpb=0.7,  # Crossover probability (Will play around with this)
+            mutpb=0.08,  # Mutation probability (Will play around with this)
+            ngen=n_generations,
+            stats=stats,
+            verbose=True,
+        )
+    except Exception as e:
+        logger.error(f"DEAP run has failed: {e}")
+        logger.error(traceback.format_exc())
+        return None, None
 
     # Get the best individual
     best_ind = tools.selBest(population, k=1)[0]
     deap_stats = list(logbook)
     deap_df = pd.DataFrame(deap_stats)
 
-    output_dir = Path(__file__).resolve().parent.parent / "usage_data"
-    deap_df.to_csv(output_dir / "deap_stats_log.csv", index=False)
+    try:
+        output_dir = Path(__file__).resolve().parent.parent / "usage_data"
+        deap_df.to_csv(output_dir / "deap_stats_log.csv", index=False)
+    except Exception as e:
+        logger.error(f"Failed to save DEAP model memory and runtime data: {e}")
 
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_ind) > 0
