@@ -2,12 +2,34 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import re
+from utils.logger import logger
 
 usage_data_path = Path(__file__).resolve().parent.parent / "usage_data"
 def gen_runtime_plots():
     # Load the stats logs
-    deap_df = pd.read_csv(usage_data_path / "deap_stats_log.csv")
-    pygad_df = pd.read_csv(usage_data_path / "pygad_stats_log.csv")
+    try:
+        deap_df = pd.read_csv(usage_data_path / "deap_stats_log.csv")
+    except FileNotFoundError as e:
+        logger.error(f"No deap stats file found at {usage_data_path}. Failed to create runtime plots: {e}")
+        return
+    except ValueError as e:
+        logger.error(f"Value error parsing deap stats at {usage_data_path}: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Could not parse deap stats at {usage_data_path}: {e}")
+        return
+
+    try:
+        pygad_df = pd.read_csv(usage_data_path / "pygad_stats_log.csv")
+    except FileNotFoundError as e:
+        logger.error(f"No pygad stats file found at {usage_data_path}. Failed to create runtime plots: {e}")
+        return
+    except ValueError as e:
+        logger.error(f"Value error parsing pygad stats at {usage_data_path}: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Could not parse pygad stats at {usage_data_path}: {e}")
+        return
 
     # Plot convergence for DEAP
     plt.figure(figsize=(12, 5))
@@ -32,7 +54,14 @@ def gen_runtime_plots():
 
 def gen_usage_plots():
     # Read the profiling results from the CSV file
-    profile_df = pd.read_csv(usage_data_path / "ga_profiling_results.csv")
+    try:
+        profile_df = pd.read_csv(usage_data_path / "ga_profiling_results.csv")
+    except FileNotFoundError as e:
+        logger.error(f"No profile stats file found at {usage_data_path}. Failed to create usage plots: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Failed to read profile stats file found at {usage_data_path}: {e}")
+        return
 
     plt.figure(figsize=(10, 4))
 
@@ -53,8 +82,22 @@ def gen_usage_plots():
 
 def gen_cpu_profile_plots():
     # Parse each algorithm's profile data
-    df_deap = parse_cprofile_txt(usage_data_path / "DEAP_cpu_profile.txt")
-    df_pygad = parse_cprofile_txt(usage_data_path / "PyGAD_cpu_profile.txt")
+    try:
+        df_deap = parse_cprofile_txt(usage_data_path / "DEAP_cpu_profile.txt")
+    except FileNotFoundError as e:
+        logger.error(f" No deap cpu usage stats file found at {usage_data_path}. Failed to create cpu profile plots: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Failed to parse deap cpu usage stats file at {usage_data_path}. {e}")
+
+    try:
+        df_pygad = parse_cprofile_txt(usage_data_path / "PyGAD_cpu_profile.txt")
+    except FileNotFoundError as e:
+        logger.error(f"No pygad cpu usage stats file found at {usage_data_path}. Failed to create cpu profile plots: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Failed to parse pygad cpu usage stats at {usage_data_path}: {e}")
+        return
 
     # Plot the top 10 functions
     plot_top_functions(df_deap, df_pygad, top=10)
@@ -67,8 +110,15 @@ def parse_cprofile_txt(profile_file):
     )
 
     # Find the table portion after "Ordered by: cumulative time"
-    with profile_file.open() as f:
-        lines = f.readlines()
+    try:
+        with profile_file.open() as f:
+            lines = f.readlines()
+    except FileNotFoundError as e:
+        logger.error(f"Could not find cpu profiling file {profile_file}: {e}")
+        return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"Could not parse cpu profiling file {profile_file}: {e}")
+        return pd.DataFrame()
 
     # cProfile prints a header line with "ncalls tottime percall ...", so we skip down to that
     header_idx = None
@@ -78,6 +128,7 @@ def parse_cprofile_txt(profile_file):
             break
 
     if header_idx is None:
+        logger.error(f"No valid cpu profiling data found in {profile_file}")
         return pd.DataFrame()  # If table never found
 
     data_lines = []
@@ -104,6 +155,10 @@ def parse_cprofile_txt(profile_file):
     return pd.DataFrame(records)
 
 def plot_top_functions(df_deap, df_pygad, top=10):
+    if df_deap.empty or df_pygad.empty:
+        logger.error("One or both cpu profiling dataframes are empty. Skipping cpu plots.")
+        return
+
     # Sort by descending cumtime and slice top rows
     df_deap_top = df_deap.sort_values(by="cumtime", ascending=False).head(top)
     df_pygad_top = df_pygad.sort_values(by="cumtime", ascending=False).head(top)
