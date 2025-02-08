@@ -3,7 +3,7 @@ from visualisations import visualisation_generator as vg
 
 def main():
     # Run algorithms and save data
-    usage.run_GAs_and_gen_data()
+    usage.run_GAs_and_gen_data(data_set_name="small_dataset_1")
 
     # Create visualisations from the data
     # vg.gen_usage_plots()
