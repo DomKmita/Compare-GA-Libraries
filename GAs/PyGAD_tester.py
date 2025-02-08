@@ -1,42 +1,10 @@
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pygad
 import traceback
 from utils.logger import logger
-
-# Load dataset
-dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
-try:
-    df = pd.read_csv(dataset_path)
-    y = df["target"].values
-    X = df.drop("target", axis=1).values
-
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
-except FileNotFoundError:
-    logger.error(f"Dataset not found at: {dataset_path}. PyGAD failed to run")
-    raise
-
-# Fitness function
-def fitness_function(ga_instance, solution, solution_idx):
-    try:
-        predictions = np.dot(X_train, solution) > 0
-        predictions = predictions.astype(int)
-        accuracy = accuracy_score(y_train, predictions)
-        return accuracy,
-    except Exception as e:
-        logger.error(f"Error in pygad fitness function at index {solution_idx}: {e}")
-        return np.nan,
-
-# GA parameters
-num_generations = 50
-num_parents_mating = 15
-sol_per_pop = 100
-num_genes = X_train.shape[1]
-mutation_probability = 0.08
 
 """
     Callback function to track average & max fitness per generation.
@@ -79,29 +47,56 @@ def on_generation(ga_instance):
     later down the line. 
 '''
 
-# Attempting to have as similar to the DEAP implementation. Might refactor both to ensure consistency. The commented
-# sections require some revisiting as they differ slightly to the DEAP tester.
-ga_instance = pygad.GA(
-    num_generations=num_generations,
-    num_parents_mating=num_parents_mating, # This is a slight issue. DEAP doesn't seem to have an equivalent parameter.
-    fitness_func=fitness_function,
-    sol_per_pop=sol_per_pop,
-    num_genes=num_genes,
-    init_range_low=-1.0,
-    init_range_high=1.0,
-    mutation_probability=mutation_probability,
-    crossover_probability=0.7,
-    mutation_type="inversion", # Current DEAP implementation uses Inversion mutation. Possible options here are: random,
-    # swap, inversion, scramble and adaptive.
-    crossover_type="single_point", # Current DEAP implementation uses cxBlend. Possible options here are: single-point,
-    # two-points, uniform and scattered.
-    parent_selection_type="tournament", # Changed to tournament as this way I can better control the behaviour of both
-    # libraries
-    K_tournament=3,
-    on_generation=on_generation,
-)
+def run_ga(df):
+    # Train-test split
+    y = df["target"].values
+    X = df.drop("target", axis=1).values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
 
-def run_ga():
+    # GA parameters
+    num_generations = 50
+    num_parents_mating = 15
+    sol_per_pop = 100
+    num_genes = X_train.shape[1]
+    mutation_probability = 0.08
+
+    # Fitness function
+    def fitness_function(ga_instance, solution, solution_idx):
+        try:
+            predictions = np.dot(X_train, solution) > 0
+            predictions = predictions.astype(int)
+            accuracy = accuracy_score(y_train, predictions)
+            return accuracy,
+        except Exception as e:
+            logger.error(f"Error in pygad fitness function at index {solution_idx}: {e}")
+            return np.nan,
+
+    # Attempting to have as similar to the DEAP implementation. Might refactor both to ensure consistency. The commented
+    # sections require some revisiting as they differ slightly to the DEAP tester.
+    ga_instance = pygad.GA(
+        num_generations=num_generations,
+        num_parents_mating=num_parents_mating,
+        # This is a slight issue. DEAP doesn't seem to have an equivalent parameter.
+        fitness_func=fitness_function,
+        sol_per_pop=sol_per_pop,
+        num_genes=num_genes,
+        init_range_low=-1.0,
+        init_range_high=1.0,
+        mutation_probability=mutation_probability,
+        crossover_probability=0.7,
+        mutation_type="inversion",
+        # Current DEAP implementation uses Inversion mutation. Possible options here are: random,
+        # swap, inversion, scramble and adaptive.
+        crossover_type="single_point",
+        # Current DEAP implementation uses cxBlend. Possible options here are: single-point,
+        # two-points, uniform and scattered.
+        parent_selection_type="tournament",
+        # Changed to tournament as this way I can better control the behaviour of both
+        # libraries
+        K_tournament=3,
+        on_generation=on_generation,
+    )
+
     # Run the GA
     try:
         ga_instance.run()
@@ -113,12 +108,7 @@ def run_ga():
     # Get the best solution
     best_solution, best_solution_fitness, _ = ga_instance.best_solution()
 
-    try:
-        pygad_df = pd.DataFrame(stats_log)
-        output_dir = Path(__file__).resolve().parent.parent / "usage_data"
-        pygad_df.to_csv(output_dir / "pygad_stats_log.csv", index=False)
-    except Exception as e:
-        logger.error(f"Failed to save PyGAD memory and runtime data: {e}")
+    pygad_df = pd.DataFrame(stats_log)
 
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_solution) > 0
@@ -128,4 +118,4 @@ def run_ga():
     print("Best Weights:", best_solution)
     print("Test Accuracy:", test_accuracy)
 
-    return best_solution, test_accuracy
+    return best_solution, test_accuracy, pygad_df

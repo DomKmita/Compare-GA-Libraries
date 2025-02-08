@@ -5,11 +5,12 @@ import io
 import pandas as pd
 from memory_profiler import memory_usage
 from utils.logger import logger
+from pathlib import Path
 
 from GAs import DEAP_tester
 from GAs import PyGAD_tester
 
-def profile(GA_run_callback, label):
+def profile(GA_run_callback, data, ga_name, directory_label):
     # Start logging cpu profile, runtime and memory usage
     try:
         mem_before = memory_usage()[0]
@@ -18,14 +19,14 @@ def profile(GA_run_callback, label):
         profiler.enable()
 
         # Run GA
-        GA_run_callback()
+        best_solution, unseen_data_test_accuracy, ga_fitness_training_stats = GA_run_callback(data)
 
         # End logging cpu profile, runtime and memory usage
         profiler.disable()
         end_time = time.time()
         mem_after = memory_usage()[0]
     except Exception as e:
-        logger.error(f"Failed to gather profiling data for {label}: {e}")
+        logger.error(f"Failed to gather profiling data for {ga_name}: {e}")
         return pd.DataFrame()
 
     try:
@@ -33,33 +34,68 @@ def profile(GA_run_callback, label):
         ps = pstats.Stats(profiler, stream=s).sort_stats(pstats.SortKey.CUMULATIVE)
         ps.print_stats()
     except Exception as e:
-        logger.error(f"Failed to generate pstats from cpu profiling data for {label}: {e}")
+        logger.error(f"Failed to generate pstats from cpu profiling data for {ga_name}: {e}")
 
-    df = pd.DataFrame([{
-        "Algorithm": label,
+    runtime_and_memory_stats = pd.DataFrame([{
+        "Algorithm": ga_name,
         "Runtime (s)": end_time - start_time,
         "Memory Usage (MB)": mem_after - mem_before,
     }])
 
+    profiling_stats = s.getvalue()
+
+    return runtime_and_memory_stats, ga_fitness_training_stats, profiling_stats, best_solution, unseen_data_test_accuracy
+
+def load_data():
+    # Load dataset
+    dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
+    try:
+        return pd.read_csv(dataset_path)
+    except FileNotFoundError as e:
+        logger.error(f"Dataset not found at: {dataset_path}. Failed to run: {e}")
+        return pd.DataFrame()
+
+def save_data(ga_name, directory_label, profiling_stats, memory_and_runtime_stats, fitness_stats):
     # Saving these to separate files as their format isn't suitable for a df and require additional parsing
-    profile_filename = f"usage_data/{label}_cpu_profile.txt"
+    output_dir = Path(__file__).resolve().parent.parent / "usage_data" / directory_label
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    # profiling results
+    profile_filename = f"{output_dir}/{ga_name}_cpu_profile.txt"
     try:
         with open(profile_filename, "w") as f:
-            f.write(s.getvalue())
+            f.write(profiling_stats)
     except Exception as e:
         logger.error(f"Could not write profile file to {profile_filename}: {e}")
 
-    return df
+    # fitness results
+    try:
+        fitness_stats.to_csv(output_dir / f"{ga_name}_fitness_stats_log.csv", index=False)
+    except Exception as e:
+        logger.error(f"Failed to save {ga_name} model memory and runtime data: {e}")
+
+    # memory results
+    try:
+        if memory_and_runtime_stats is not None:
+            memory_and_runtime_stats.to_csv(output_dir / "ga_profiling_results.csv", index=False)
+    except Exception as e:
+        logger.error(f"Failed to save memory and runtime data: {e}")
 
 def run_GAs_and_gen_data():
+    directory_label = "small_tests"
+    # load dataset
+    df = load_data()
     # Profile both algorithms
-    deap_results = profile(DEAP_tester.run_ga, "DEAP")
-    pygad_results = profile(PyGAD_tester.run_ga, "PyGAD")
+    deap_memory_and_runtime_stats, deap_fitness_stats, deap_profiling_stats, best_deap_ind, deap_unseen_data_test_accuracy = profile(DEAP_tester.run_ga, df, "DEAP", directory_label)
+    pygad_memory_and_runtime_stats_results, pygad_fitness_stats, pygad_profiling_stats, best_pygad_ind, pyad_unseen_data_test_accuracy = profile(PyGAD_tester.run_ga, df, "PyGAD", directory_label)
 
     # Combine results (they are small and this makes them easier to visualise
-    results_df = pd.concat([deap_results, pygad_results], ignore_index=True)
+    results_df = pd.concat([deap_memory_and_runtime_stats, pygad_memory_and_runtime_stats_results], ignore_index=True)
 
-    # Save results to CSV
-    results_df.to_csv("usage_data/ga_profiling_results.csv", index=False)
+    save_data("DEAP", directory_label, deap_profiling_stats, None, deap_fitness_stats)
+    save_data("PyGAD", directory_label, deap_profiling_stats, results_df, deap_fitness_stats)
 
     print("Profiling results saved to usage_data/ga_profiling_results.csv")
+
+
+
