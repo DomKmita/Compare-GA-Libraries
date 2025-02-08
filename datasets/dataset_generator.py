@@ -2,6 +2,7 @@ from sklearn.datasets import make_classification
 from scipy.sparse import csr_matrix
 import pandas as pd
 import numpy as np
+from utils.logger import logger
 
 # Function to generate datasets with specified parameters
 # Make classification is used as it allows for greater control
@@ -85,23 +86,27 @@ datasetTypeMap = {
 
 def generate_datasets():
     for label, dataset_type in datasetTypeMap.items():
-        # keeping sample size static for now. Once data is analysed I'll see what data properties to test for at larger
-        # dataset sizes
-        X, y = generate_dataset(10000, n_features = dataset_type[0], n_classes = dataset_type[1],
-                                informative = dataset_type[2], redundant = dataset_type[3],weights = dataset_type[4],
-                                separability = dataset_type[5], outliers = dataset_type[6], feature_type = dataset_type[7])
+        try:
+            # keeping sample size static for now. Once data is analysed I'll see what data properties to test for at larger
+            # dataset sizes
+            X, y = generate_dataset(10000, n_features = dataset_type[0], n_classes = dataset_type[1],
+                                    informative = dataset_type[2], redundant = dataset_type[3],weights = dataset_type[4],
+                                    separability = dataset_type[5], outliers = dataset_type[6], feature_type = dataset_type[7])
 
-        # convert final dataset to be sparse. This can't be done during generation and therefore it must be transformed
-        if label == "properties_level_3":
-            X = csr_matrix(X)
-            # Append features
-            df = pd.DataFrame(X.toarray(), columns=[f"feature_{i}" for i in range(X.shape[1])])
-        else:
-            df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
+            # convert final dataset to be sparse. This can't be done during generation and therefore it must be transformed
+            if label == "properties_level_3":
+                X = csr_matrix(X)
+                # Append features
+                df = pd.DataFrame(X.toarray(), columns=[f"feature_{i}" for i in range(X.shape[1])])
+            else:
+                df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
 
-        # Append target classification
-        df['target'] = y
+            # Append target classification
+            df['target'] = y
 
-        # Save to CSV
-        df.to_csv(f"small_dataset_{label}.csv", index=False)
-        print(f"Dataset_{label} saved as small_dataset_{label}.csv")
+            # Save to CSV
+            df.to_csv(f"small_dataset_{label}.csv", index=False)
+            print(f"Dataset_{label} saved as small_dataset_{label}.csv")
+        except Exception as e:
+            logger.error(f"Failed to generate dataset_{label}: {e}")
+

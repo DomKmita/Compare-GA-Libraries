@@ -4,22 +4,32 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pygad
+import traceback
+from utils.logger import logger
 
 # Load dataset
 dataset_path = Path(__file__).resolve().parent.parent / "datasets" / "small_dataset_default_version.csv"
-df = pd.read_csv(dataset_path)
-y = df["target"].values
-X = df.drop("target", axis=1).values
+try:
+    df = pd.read_csv(dataset_path)
+    y = df["target"].values
+    X = df.drop("target", axis=1).values
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
+except FileNotFoundError:
+    logger.error(f"Dataset not found at: {dataset_path}. PyGAD failed to run")
+    raise
 
 # Fitness function
 def fitness_function(ga_instance, solution, solution_idx):
-    predictions = np.dot(X_train, solution) > 0
-    predictions = predictions.astype(int)
-    accuracy = accuracy_score(y_train, predictions)
-    return accuracy,
+    try:
+        predictions = np.dot(X_train, solution) > 0
+        predictions = predictions.astype(int)
+        accuracy = accuracy_score(y_train, predictions)
+        return accuracy,
+    except Exception as e:
+        logger.error(f"Error in pygad fitness function at index {solution_idx}: {e}")
+        return np.nan,
 
 # GA parameters
 num_generations = 50
@@ -36,14 +46,18 @@ mutation_probability = 0.08
 # Store stats per generation
 stats_log = []
 def on_generation(ga_instance):
-    population_fitness = ga_instance.last_generation_fitness
-    avg_fitness = np.mean(population_fitness)
-    max_fitness = np.max(population_fitness)
-    nevals = len(population_fitness)  # Number of evaluations
+    try:
+        population_fitness = ga_instance.last_generation_fitness
+        avg_fitness = np.mean(population_fitness)
+        max_fitness = np.max(population_fitness)
+        nevals = len(population_fitness)  # Number of evaluations
 
-    stats_log.append({"gen": ga_instance.generations_completed, "nevals": nevals, "avg": avg_fitness, "max": max_fitness})
+        stats_log.append({"gen": ga_instance.generations_completed, "nevals": nevals, "avg": avg_fitness, "max": max_fitness})
 
-    print(f"{ga_instance.generations_completed:<3}{nevals:<9}{avg_fitness:<10.6f}{max_fitness:<10.6f}")
+        print(f"{ga_instance.generations_completed:<3}{nevals:<9}{avg_fitness:<10.6f}{max_fitness:<10.6f}")
+    except Exception as e:
+        logger.error(f"Error logging stats at generation {ga_instance.generations_completed}: {e}")
+        print(f"Error logging pygad stats at generation {ga_instance.generations_completed}: {e}")
 
 
 '''
@@ -89,14 +103,22 @@ ga_instance = pygad.GA(
 
 def run_ga():
     # Run the GA
-    ga_instance.run()
+    try:
+        ga_instance.run()
+    except Exception as e:
+        logger.error(f"PyGAD run has failed: {e}")
+        logger.error(traceback.format_exc())
+        return None, None
 
     # Get the best solution
     best_solution, best_solution_fitness, _ = ga_instance.best_solution()
 
-    pygad_df = pd.DataFrame(stats_log)
-    output_dir = Path(__file__).resolve().parent.parent / "usage_data"
-    pygad_df.to_csv(output_dir / "pygad_stats_log.csv", index=False)
+    try:
+        pygad_df = pd.DataFrame(stats_log)
+        output_dir = Path(__file__).resolve().parent.parent / "usage_data"
+        pygad_df.to_csv(output_dir / "pygad_stats_log.csv", index=False)
+    except Exception as e:
+        logger.error(f"Failed to save PyGAD memory and runtime data: {e}")
 
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_solution) > 0
