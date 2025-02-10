@@ -55,38 +55,29 @@ def gen_usage_plots(dataset_size, dataset_name):
     dataset_path = get_path("usage_data", dataset_size, dataset_name)
     try:
         profile_df = pd.read_csv(dataset_path / "ga_profiling_results.csv")
-        profile_df["Memory Usage (MB)"] = profile_df["Memory Usage (MB)"].apply(ast.literal_eval)
     except Exception as e:
         logger.error(f"Error loading GA profiling results for {dataset_name}: {e}")
         return
 
-    # Compute average & peak memory for each algorithm row
-    profile_df["AvgMem"] = profile_df["Memory Usage (MB)"].apply(lambda mem: np.mean(mem))
-    profile_df["PeakMem"] = profile_df["Memory Usage (MB)"].apply(lambda mem: np.max(mem))
+    plt.figure(figsize=(10, 4))
 
-    plt.figure(figsize=(4, 4))
+    # Runtime
+    plt.subplot(1, 2, 1)
     plt.bar(profile_df["Algorithm"], profile_df["Runtime (s)"], color=["blue", "orange"])
     plt.ylabel("Runtime (s)")
-    plt.title(f"Runtime Comparison \n {dataset_name}")
+    plt.title(f"Runtime Comparison\n{dataset_name}")
+
+    # Peak Memory
+    plt.subplot(1, 2, 2)
+    plt.bar(profile_df["Algorithm"], profile_df["Peak Memory (MB)"], color=["blue", "orange"])
+    plt.ylabel("Peak Memory (MB)")
+    plt.title(f"Memory Usage Comparison\n{dataset_name}")
+
+    plt.tight_layout()
     figure_dir = get_path("visualisations", dataset_size, dataset_name)
     figure_dir.mkdir(parents=True, exist_ok=True)
-    plt.tight_layout()
-    plt.savefig(figure_dir / f"{dataset_name}_runtime.png", dpi=300)
-    plt.show()
-    plt.close()
-
-    plt.figure(figsize=(4, 4))
-    algs = profile_df["Algorithm"]
-    avg_vals = profile_df["AvgMem"]
-    peak_vals = profile_df["PeakMem"]
-
-    yerr = peak_vals - avg_vals
-
-    plt.bar(algs, avg_vals, yerr=yerr, capsize=5, color=["blue", "orange"])
-    plt.ylabel("Memory (MB)")
-    plt.title(f"Memory Usage - Avg + Peak \n {dataset_name}")
-    plt.tight_layout()
-    plt.savefig(figure_dir / f"{dataset_name}_memory.png", dpi=300)
+    filename = figure_dir / f"{dataset_name}_usage.png"
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.show()
     plt.close()
 
@@ -175,11 +166,6 @@ def gen_aggregated_usage_plots(dataset_size):
     for d in usage_dirs:
         try:
             df_usage = pd.read_csv(d / "ga_profiling_results.csv")
-            # convert string list to regular list
-            df_usage["Memory Usage (MB)"] = df_usage["Memory Usage (MB)"].apply(ast.literal_eval)
-            # Compute average & peak memory for each run
-            df_usage["AvgMem"] = df_usage["Memory Usage (MB)"].apply(np.mean)
-            df_usage["PeakMem"] = df_usage["Memory Usage (MB)"].apply(np.max)
             usage_list.append(df_usage)
         except Exception as e:
             logger.error(f"Error loading GA profiling results from {d.name}: {e}")
@@ -188,28 +174,34 @@ def gen_aggregated_usage_plots(dataset_size):
         logger.error("No GA profiling data available for aggregated usage plots.")
         return
 
-    # combine all averages
+    # Combine all usage DataFrames
     agg_usage = pd.concat(usage_list)
 
-    agg_usage_bar = agg_usage.groupby("Algorithm", as_index=False).agg({
-        "Runtime (s)": "mean",
-        "AvgMem": "mean",
-        "PeakMem": "mean"
-    })
+    # Compute mean runtime and mean peak memory
+    agg_usage_bar = agg_usage.groupby("Algorithm", as_index=False).mean(
+        numeric_only=True
+    )
 
+    # Plot aggregated bar charts
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 
-    axs[0].bar(agg_usage_bar["Algorithm"], agg_usage_bar["Runtime (s)"], color=["blue", "orange"])
+    # Runtime bar
+    axs[0].bar(
+        agg_usage_bar["Algorithm"],
+        agg_usage_bar["Runtime (s)"],
+        color=["blue", "orange"]
+    )
     axs[0].set_ylabel("Runtime (s)")
     axs[0].set_title(f"Averaged Runtime ({dataset_size} Datasets)")
 
-    avg_vals = agg_usage_bar["AvgMem"]
-    peak_vals = agg_usage_bar["PeakMem"]
-    yerr = peak_vals - avg_vals
-
-    axs[1].bar(agg_usage_bar["Algorithm"], avg_vals, yerr=yerr, color=["blue", "orange"], capsize=5)
-    axs[1].set_ylabel("Memory (MB)")
-    axs[1].set_title(f"Averaged Memory + Peak ({dataset_size} Datasets)")
+    # Peak memory bar
+    axs[1].bar(
+        agg_usage_bar["Algorithm"],
+        agg_usage_bar["Peak Memory (MB)"],
+        color=["blue", "orange"]
+    )
+    axs[1].set_ylabel("Peak Memory (MB)")
+    axs[1].set_title(f"Averaged Memory Usage ({dataset_size} Datasets)")
 
     plt.tight_layout()
     figure_dir = get_path("visualisations", dataset_size, "aggregate")

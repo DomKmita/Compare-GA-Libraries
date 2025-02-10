@@ -2,6 +2,7 @@ import time
 import cProfile
 import pstats
 import io
+import numpy as np
 import pandas as pd
 from memory_profiler import memory_usage
 from utils.logger import logger
@@ -85,20 +86,104 @@ def save_data(ga_name, directory_label, profiling_stats, memory_and_runtime_stat
     except Exception as e:
         logger.error(f"Failed to save memory and runtime data: {e}")
 
-def run_GAs_and_gen_data(data_set_name):
-    # load dataset
+def run_GAs_and_gen_data(data_set_name, num_runs=3):
     df = load_data(data_set_name)
-    # Profile both algorithms
-    deap_memory_and_runtime_stats, deap_fitness_stats, deap_profiling_stats, best_deap_ind, deap_unseen_data_test_accuracy = profile(DEAP_tester.run_ga, df, "DEAP")
-    pygad_memory_and_runtime_stats_results, pygad_fitness_stats, pygad_profiling_stats, best_pygad_ind, pyad_unseen_data_test_accuracy = profile(PyGAD_tester.run_ga, df, "PyGAD")
+    
+    # Deap run data 
+    deap_runs = []
+    deap_fitness_frames = []
+    deap_profiling_txt = [] 
 
-    # Combine results (they are small and this makes them easier to visualise
-    results_df = pd.concat([deap_memory_and_runtime_stats, pygad_memory_and_runtime_stats_results], ignore_index=True)
+    # PyGAD run data
+    pygad_runs = []
+    pygad_fitness_frames = []
+    pygad_profiling_txt = []
 
-    save_data("DEAP", data_set_name, deap_profiling_stats, None, deap_fitness_stats)
-    save_data("PyGAD", data_set_name, pygad_profiling_stats, results_df, pygad_fitness_stats)
+    for _ in range(num_runs):
+        # DEAP single run
+        (memory_and_runtime_data_deap, fitness_data_deap, profiling_data_deap, best_ind_deap,
+         unseen_data_accuracy_deap) = profile(DEAP_tester.run_ga, df, "DEAP")
+        if not memory_and_runtime_data_deap.empty:
+            deap_runs.append(memory_and_runtime_data_deap)
+        if fitness_data_deap is not None and not fitness_data_deap.empty:
+            deap_fitness_frames.append(fitness_data_deap)
+        if profiling_data_deap:
+            deap_profiling_txt.append(profiling_data_deap)
 
-    print("Profiling results saved to usage_data")
+        # PyGAD single run
+        (memory_and_runtime_data_pygad, fitness_data_pygad, profiling_data_pygad, best_ind_pygad,
+         unseen_data_accuracy_pygad) = profile(PyGAD_tester.run_ga, df, "PyGAD")
+        if not memory_and_runtime_data_pygad.empty:
+            pygad_runs.append(memory_and_runtime_data_pygad)
+        if fitness_data_pygad is not None and not fitness_data_pygad.empty:
+            pygad_fitness_frames.append(fitness_data_pygad)
+        if profiling_data_pygad:
+            pygad_profiling_txt.append(profiling_data_pygad)
 
+    # Combine/average DEAP stats 
+    if deap_runs:
+        deap_concat = pd.concat(deap_runs, ignore_index=True)
+        # Store a single row with average runtime + average/peak memory usage
+        # Because memory usage is a *list* of floats, can’t directly average them in a normal sense.
+        # Instead, store peak memory usage per run, and then average that across runs.
+        deap_concat["PeakMem"] = deap_concat["Memory Usage (MB)"].apply(np.max)
+        deap_concat["Runtime (s)"] = deap_concat["Runtime (s)"]
+        avg_runtime = deap_concat["Runtime (s)"].mean()
+        avg_peak_mem = deap_concat["PeakMem"].mean()
 
+        # Build a 1-row DataFrame for DEAP
+        deap_final_df = pd.DataFrame([{
+            "Algorithm": "DEAP",
+            "Runtime (s)": avg_runtime,
+            "Peak Memory (MB)": avg_peak_mem,
+        }])
+    else:
+        deap_final_df = pd.DataFrame()
+
+    # Merge all DEAP fitness logs into one, then average numeric columns
+    if deap_fitness_frames:
+        deap_fitness_concat = pd.concat(deap_fitness_frames, ignore_index=True)
+        
+        # A single averaged log, grouping by 'gen' and averaging the rest
+        deap_fitness_agg = deap_fitness_concat.groupby("gen", as_index=False).mean()
+    else:
+        deap_fitness_agg = pd.DataFrame()
+
+    # Combine DEAP cProfile texts. 
+    deap_profile_str = "\n\n".join(deap_profiling_txt) if deap_profiling_txt else ""
+
+    # Combine/average PyGAD stats
+    if pygad_runs:
+        pygad_concat = pd.concat(pygad_runs, ignore_index=True)
+        pygad_concat["PeakMem"] = pygad_concat["Memory Usage (MB)"].apply(np.max)
+        pygad_concat["Runtime (s)"] = pygad_concat["Runtime (s)"]
+        avg_runtime = pygad_concat["Runtime (s)"].mean()
+        avg_peak_mem = pygad_concat["PeakMem"].mean()
+
+        pygad_final_df = pd.DataFrame([{
+            "Algorithm": "PyGAD",
+            "Runtime (s)": avg_runtime,
+            "Peak Memory (MB)": avg_peak_mem,
+        }])
+    else:
+        pygad_final_df = pd.DataFrame()
+
+    # Merge all PyGAD fitness logs into one, then average numeric columns
+    if pygad_fitness_frames:
+        pygad_fitness_concat = pd.concat(pygad_fitness_frames, ignore_index=True)
+        pygad_fitness_agg = pygad_fitness_concat.groupby("gen", as_index=False).mean()
+    else:
+        pygad_fitness_agg = pd.DataFrame()
+
+    # Combine PyGAD cProfile texts
+    pygad_profile_str = "\n\n".join(pygad_profiling_txt) if pygad_profiling_txt else ""
+
+    # Combine final usage stats from DEAP & PyGAD into a single DataFrame
+    results_df = pd.concat([deap_final_df, pygad_final_df], ignore_index=True)
+
+    # Save everything
+    save_data("DEAP", data_set_name, deap_profile_str, None, deap_fitness_agg)
+    save_data("PyGAD", data_set_name, pygad_profile_str, results_df, pygad_fitness_agg)
+
+    print(f"[{data_set_name}] Profiling results saved to usage_data")
 
