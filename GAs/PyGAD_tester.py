@@ -10,7 +10,6 @@ from utils.logger import logger
     Callback function to track average & max fitness per generation.
     This is to replicate DEAPs stats functionality.
 """
-
 # Store stats per generation
 stats_log = []
 def on_generation(ga_instance):

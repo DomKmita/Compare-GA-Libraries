@@ -13,18 +13,20 @@ from GAs import PyGAD_tester
 def profile(GA_run_callback, data, ga_name):
     # Start logging cpu profile, runtime and memory usage
     try:
-        mem_before = memory_usage()[0]
         start_time = time.time()
         profiler = cProfile.Profile()
         profiler.enable()
 
         # Run GA
-        best_solution, unseen_data_test_accuracy, ga_fitness_training_stats = GA_run_callback(data)
+        mem_usage_list, (best_solution, unseen_data_test_accuracy, ga_fitness_training_stats) = memory_usage(
+            (GA_run_callback, (data,)),
+            interval=0.1,
+            retval=True
+        )
 
         # End logging cpu profile, runtime and memory usage
         profiler.disable()
         end_time = time.time()
-        mem_after = memory_usage()[0]
     except Exception as e:
         logger.error(f"Failed to gather profiling data for {ga_name}: {e}")
         return pd.DataFrame()
@@ -35,11 +37,12 @@ def profile(GA_run_callback, data, ga_name):
         ps.print_stats()
     except Exception as e:
         logger.error(f"Failed to generate pstats from cpu profiling data for {ga_name}: {e}")
+        return pd.DataFrame()
 
     runtime_and_memory_stats = pd.DataFrame([{
         "Algorithm": ga_name,
         "Runtime (s)": end_time - start_time,
-        "Memory Usage (MB)": mem_after - mem_before,
+        "Memory Usage (MB)": mem_usage_list,
     }])
 
     profiling_stats = s.getvalue()
@@ -93,7 +96,7 @@ def run_GAs_and_gen_data(data_set_name):
     results_df = pd.concat([deap_memory_and_runtime_stats, pygad_memory_and_runtime_stats_results], ignore_index=True)
 
     save_data("DEAP", data_set_name, deap_profiling_stats, None, deap_fitness_stats)
-    save_data("PyGAD", data_set_name, deap_profiling_stats, results_df, deap_fitness_stats)
+    save_data("PyGAD", data_set_name, pygad_profiling_stats, results_df, pygad_fitness_stats)
 
     print("Profiling results saved to usage_data")
 
