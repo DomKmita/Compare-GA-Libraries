@@ -1,5 +1,6 @@
 from usage_data import usage_tracking_script as usage
 from visualisations import visualisation_generator as vg
+from usage_data import xlsx_table_generator as tg
 import pathlib
 
 def main():
@@ -18,6 +19,8 @@ def main():
     vg.gen_aggregated_usage_plots(size)
     vg.gen_aggregated_fitness_plots(size)
     vg.gen_aggregated_cpu_profile_plots(size)
+
+    tg.aggregate_results_to_xlsx(size, "base_algorithm_xlsx_aggregate_data")
 
 if __name__ == "__main__":
     main()

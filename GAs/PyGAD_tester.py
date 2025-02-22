@@ -43,7 +43,7 @@ def on_generation(ga_instance):
 
     Using main module below. Will also use visualize, utils and helper. Considering using others, however DEAP does not
     have functionality for training neural networks or training Keras or PyTorch. This might be something I look at 
-    later down the line. 
+    later down the line.  
 '''
 
 def run_ga(df):

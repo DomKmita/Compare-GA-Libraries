@@ -129,7 +129,7 @@ def run_ga(df):
     """
     toolbox.register("mutate", tools.mutInversion)  # Current PyGAD implementation uses
     # Inversion mutation possible options here are: Inversion, FlipBit, UniformInt, ShuffleIndexes, ESLogNormal,
-    # PolynomialBounded mutGaussian
+    # PolynomialBounded, Gaussian
 
     """
     *** From Docs: Selection is made among a population by the selection operators that are available in the deap.tools 
