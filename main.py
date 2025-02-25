@@ -4,23 +4,25 @@ from usage_data import xlsx_table_generator as tg
 import pathlib
 
 def main():
-    # Run for each dataset in datasets (currently just small)
+    # Run algorithms and save data
     size = "small"
-    for p in pathlib.Path('datasets').iterdir():
-        if p.is_file() and p.suffix == '.csv':
-            # Run algorithms and save data
-            usage.run_GAs_and_gen_data(data_set_name=p.stem)
+    usage.run_GAs_and_gen_data(size=size, num_runs=3)
 
-            # Create visualisations from the data
-            vg.gen_usage_plots(size, p.stem)
-            vg.gen_fitness_plots(size, p.stem)
-            vg.gen_cpu_profile_plots(size, p.stem)
+    #Create visualisations from the data
+    vg.gen_usage_plots(size)
+    vg.gen_fitness_plots(size)
+    vg.gen_cpu_profile_plots(size)
 
     vg.gen_aggregated_usage_plots(size)
     vg.gen_aggregated_fitness_plots(size)
     vg.gen_aggregated_cpu_profile_plots(size)
 
+    # create tables
     tg.aggregate_results_to_xlsx(size, "base_algorithm_xlsx_aggregate_data")
+    usage.test_mutation_experiments()
+    usage.test_selection_experiments()
+    usage.test_crossover_experiments()
+    usage.test_deap_algorithm_experiments()
 
 if __name__ == "__main__":
     main()

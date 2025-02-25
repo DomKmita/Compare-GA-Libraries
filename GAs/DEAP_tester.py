@@ -8,7 +8,22 @@ from sklearn.metrics import accuracy_score
 from utils.logger import logger
 
 # Run the genetic algorithm
-def run_ga(df):
+def run_ga( df,
+    weights=(1.0,),                 # (1.0,) => maximize; (-1.0,) => minimize; multi-objective => (1.0, -1.0)
+    population_size=100,
+    n_generations=50,
+    cxpb=0.7,                       # Crossover probability
+    mutpb=0.08,                     # Mutation probability
+    selection_func=tools.selTournament,
+    selection_kwargs={"tournsize":3},  # e.g. {"tournsize":3} for selTournament
+    crossover_func=tools.cxOnePoint,
+    crossover_kwargs={},          # e.g. {"indpb":0.5} for cxUniform
+    mutation_func=tools.mutInversion,
+    mutation_kwargs={},           # e.g. {"indpb":0.05} for mutFlipBit
+    algorithm="eaSimple",           # eaSimple, eaMuPlusLambda, eaMuCommaLambda
+    number_of_parents=20,
+    number_of_offspring=20,
+            ):
     y = df["target"].values
     X = df.drop("target", axis=1).values
 
@@ -19,8 +34,7 @@ def run_ga(df):
     *** From Docs: Fitness class is an abstract class that needs a weights attribute in order to be functional. A minimizing
        fitness is built using negatives weights, while a maximizing fitness has positive weights
      """
-    creator.create("FitnessMax", base.Fitness, weights=(1.0,))  # Maximise objective (two values, potential for
-    # multi-objective)
+    creator.create("Fitness", base.Fitness, weights=weights)
 
     """ 
     *** From Docs: Simply by thinking about the different flavors of evolutionary algorithms (GA, GP, ES, PSO, DE, …), we
@@ -36,7 +50,7 @@ def run_ga(df):
                                  A Particle *(Particle Swarm Optimisation)
                                  A "Funky One" ergo custom
     """
-    creator.create("Individual", list, fitness=creator.FitnessMax)
+    creator.create("Individual", list, fitness=creator.Fitness)
 
     # Number of features
     IND_SIZE = len(X_train[0])
@@ -111,7 +125,7 @@ def run_ga(df):
         Changed from cxBlend to cxOnePoint for simplicity and consistency between PyGAD implementation that currently also
         uses single-point crossover. PyGAD does not have a cxBlend varient.
     """
-    toolbox.register("mate", tools.cxOnePoint)  # Crossover
+    toolbox.register("mate", crossover_func, **crossover_kwargs)  # Crossover
 
     """
     *** From Docs: There is a variety of mutation operators in the deap.tools module. Each mutation has its own 
@@ -127,7 +141,7 @@ def run_ga(df):
 
         Changing mutation to inversion mutation as PyGAD offers that also.
     """
-    toolbox.register("mutate", tools.mutInversion)  # Current PyGAD implementation uses
+    toolbox.register("mutate", mutation_func, **mutation_kwargs)
     # Inversion mutation possible options here are: Inversion, FlipBit, UniformInt, ShuffleIndexes, ESLogNormal,
     # PolynomialBounded, Gaussian
 
@@ -147,10 +161,9 @@ def run_ga(df):
 
         Updated to use tournament selection, this way both DEAP and PyGAD will behave more similarly.
     """
-    toolbox.register("select", tools.selTournament, tournsize=3)  # Selection
+    toolbox.register("select", selection_func, **selection_kwargs)  # Selection
 
-    population = toolbox.population(n=100)  # Population size (Will play around with this)
-    n_generations = 50  # Number of generations
+    population = toolbox.population(n=population_size)
 
     """
     *** From Docs: Often, one wants to compile statistics on what is going on in the optimization. The Statistics are 
@@ -166,9 +179,7 @@ def run_ga(df):
     stats.register("avg", np.mean)
     stats.register("max", np.max)
 
-    # Run the GA (using DEAP eaSimple, their basic GA option)
     # logbook is where the statistics are stored.
-
     """
     These are the following algorithms provided. (Note: The DEAP Team encourage users to write their own for their 
     specific use case.):    eaSimple
@@ -180,24 +191,90 @@ def run_ga(df):
 
     """
     try:
-        population, logbook = algorithms.eaSimple(
-            population,
-            toolbox,
-            cxpb=0.7,  # Crossover probability (Will play around with this)
-            mutpb=0.08,  # Mutation probability (Will play around with this)
-            ngen=n_generations,
-            stats=stats,
-            verbose=True,
-        )
+        match algorithm:
+            case "eaSimple":
+                population, logbook = algorithms.eaSimple(
+                    population,
+                    toolbox,
+                    cxpb=cxpb,
+                    mutpb=mutpb,
+                    ngen=n_generations,
+                    stats=stats,
+                    verbose=True
+                )
+            case "eaMuPlusLambda":
+                population, logbook = algorithms.eaMuPlusLambda(
+                    population,
+                    toolbox,
+                    mu=number_of_parents,  # number of parents (mu)
+                    lambda_=number_of_offspring,  # number of offspring (lambda)
+                    cxpb=cxpb,
+                    mutpb=mutpb,
+                    ngen=n_generations,
+                    stats=stats,
+                    verbose=True
+                )
+            case "eaMuCommaLambda":
+                population, logbook = algorithms.eaMuCommaLambda(
+                    population,
+                    toolbox,
+                    mu=number_of_parents,
+                    lambda_=number_of_offspring,
+                    cxpb=cxpb,
+                    mutpb=mutpb,
+                    ngen=n_generations,
+                    stats=stats,
+                    verbose=True
+                )
+            case "varAnd":
+                population = algorithms.varAnd(
+                    population,
+                    toolbox,
+                    cxpb,
+                    mutpb
+                )
+                logbook = None
+            case "varOr":
+                population = algorithms.varOr(
+                    population,
+                    toolbox,
+                    cxpb=cxpb,
+                    mutpb=mutpb,
+                    lambda_=number_of_offspring
+                )
+                logbook = None
+            case "eaGenerateUpdate":
+                # eaGenerateUpdate requires a generate method that creates a new offspring population each generation
+                toolbox.register("generate", tools.initRepeat, list, toolbox.individual, n=population_size)
+                # It also requires a hall of fame, this is a list of top individuals across the runs history (all gens)
+                hof = tools.HallOfFame(10)
+                toolbox.register("update", hof.update)
+                population, logbook = algorithms.eaGenerateUpdate(
+                    toolbox,
+                    n_generations,
+                    hof,
+                    stats,
+                    verbose=True
+                )
+            case _:
+                logger.error(f"Unknown algorithm '{algorithm}'. Falling back to eaSimple.")
+                population, logbook = algorithms.eaSimple(
+                    population,
+                    toolbox,
+                    cxpb=cxpb,
+                    mutpb=mutpb,
+                    ngen=n_generations,
+                    stats=stats,
+                    verbose=True
+                )
     except Exception as e:
         logger.error(f"DEAP run has failed: {e}")
         logger.error(traceback.format_exc())
-        return None, None
+        return None, None, pd.DataFrame()
 
     # Get the best individual
     best_ind = tools.selBest(population, k=1)[0]
-    deap_stats = list(logbook)
-    deap_df = pd.DataFrame(deap_stats)
+    deap_df = pd.DataFrame(logbook)
 
     # Test the model on unseen data
     predictions_test = np.dot(X_test, best_ind) > 0

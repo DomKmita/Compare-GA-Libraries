@@ -1,9 +1,8 @@
-import os
 from pathlib import Path
 import pandas as pd
-from utils.logger import logger
+from utils.utils import logger, get_directory, get_root
 
-BASE_USAGE_PATH = Path(__file__).resolve().parent
+
 def get_final_fitness(fitness_csv_path):
     final_fitness = []
     try:
@@ -25,52 +24,49 @@ def get_final_fitness(fitness_csv_path):
 
 def aggregate_results_to_xlsx(dataset_size="small", output_file="aggregated_results"):
     # Find all subdirectories
-    usage_dirs = [
-        d for d in (BASE_USAGE_PATH / dataset_size).iterdir()
-        if d.is_dir()
-    ]
 
     aggregated_data = []
+    path = get_directory("usage_data", dataset_size, 1)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                # Get usage data
+                df_usage = pd.read_csv(d / "ga_profiling_results.csv")
 
-    for d in usage_dirs:
-        try:
-            # Get usage data
-            df_usage = pd.read_csv(d / "ga_profiling_results.csv")
+                # split for algorithms
+                deap_stats = df_usage[df_usage["Algorithm"].str.upper() == "DEAP"]
+                pygad_stats = df_usage[df_usage["Algorithm"].str.upper() == "PYGAD"]
 
-            # split for algorithms
-            deap_stats = df_usage[df_usage["Algorithm"].str.upper() == "DEAP"]
-            pygad_stats = df_usage[df_usage["Algorithm"].str.upper() == "PYGAD"]
+                # Get fitness data
+                deap_fitness = get_final_fitness(d / "DEAP_fitness_stats_log.csv")
+                pygad_fitness = get_final_fitness(d / "PyGAD_fitness_stats_log.csv")
 
-            # Get fitness data
-            deap_fitness = get_final_fitness(d / "DEAP_fitness_stats_log.csv")
-            pygad_fitness = get_final_fitness(d / "PyGAD_fitness_stats_log.csv")
+                if deap_stats.empty or pygad_stats.empty or df_usage.empty:
+                    print(f"Missing algorithm stats in {d}")
+                    continue
 
-            if deap_stats.empty or pygad_stats.empty or df_usage.empty:
-                print(f"Missing algorithm stats in {d}")
-                continue
+                # split further into runtime and memory values
+                deap_runtime = deap_stats.iloc[0]["Runtime (s)"]
+                deap_memory = deap_stats.iloc[0]["Peak Memory (MB)"]
 
-            # split further into runtime and memory values
-            deap_runtime = deap_stats.iloc[0]["Runtime (s)"]
-            deap_memory = deap_stats.iloc[0]["Peak Memory (MB)"]
+                pygad_runtime = pygad_stats.iloc[0]["Runtime (s)"]
+                pygad_memory = pygad_stats.iloc[0]["Peak Memory (MB)"]
 
-            pygad_runtime = pygad_stats.iloc[0]["Runtime (s)"]
-            pygad_memory = pygad_stats.iloc[0]["Peak Memory (MB)"]
+                # Combine
+                aggregated_data.append({
+                    "Dataset": d.stem,
+                    "DEAP Runtime": deap_runtime,
+                    "DEAP Memory": deap_memory,
+                    "DEAP Fitness Avg": deap_fitness[0],
+                    "DEAP Fitness Max": deap_fitness[1],
+                    "PyGAD Runtime": pygad_runtime,
+                    "PyGAD Memory": pygad_memory,
+                    "PyGAD Fitness Avg": pygad_fitness[0],
+                    "PyGAD Fitness Max": pygad_fitness[1],
+                })
 
-            # Combine
-            aggregated_data.append({
-                "Dataset": d.stem,
-                "DEAP Runtime": deap_runtime,
-                "DEAP Memory": deap_memory,
-                "DEAP Fitness Avg": deap_fitness[0],
-                "DEAP Fitness Max": deap_fitness[1],
-                "PyGAD Runtime": pygad_runtime,
-                "PyGAD Memory": pygad_memory,
-                "PyGAD Fitness Avg": pygad_fitness[0],
-                "PyGAD Fitness Max": pygad_fitness[1],
-            })
-
-        except Exception as e:
-            logger.error(f"Error loading GA profiling results from {d.name}: {e}")
+            except Exception as e:
+                logger.error(f"Error loading GA profiling results from {d.name}: {e}")
 
     if not aggregated_data:
         logger.error("No GA profiling data available for xlsx aggregation")
@@ -83,7 +79,7 @@ def aggregate_results_to_xlsx(dataset_size="small", output_file="aggregated_resu
         summary_df = pd.DataFrame(aggregated_data)
         summary_df = summary_df.set_index("Dataset")
         try:
-            summary_df.to_excel(f"{BASE_USAGE_PATH}/table_data/{output_file}.xlsx")
+            summary_df.to_excel(get_directory("table_data", dataset_size) / f"{output_file}.xlsx")
             print(f"Aggregated results saved to {output_file}.xlsx")
         except Exception as e:
             print(f"Error writing Excel file: {e}")

@@ -1,125 +1,120 @@
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import re
-import ast
-from utils.logger import logger
+from utils.utils import logger, get_directory, get_path
 
-# Base path
-BASE_USAGE_PATH = Path(__file__).resolve().parent.parent
+def gen_fitness_plots(dataset_size):
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                deap_df = pd.read_csv(d / "DEAP_fitness_stats_log.csv")
+            except Exception as e:
+                logger.error(f"Error loading DEAP fitness stats for {d.stem}: {e}")
+                return
+            try:
+                pygad_df = pd.read_csv(d / "PyGAD_fitness_stats_log.csv")
+            except Exception as e:
+                logger.error(f"Error loading PyGAD fitness stats for {d.stem}: {e}")
+                return
 
-def get_path(directory, dataset_size, dataset_name):
-    return BASE_USAGE_PATH / directory / dataset_size / dataset_name
+            plt.figure(figsize=(12, 5))
+            # DEAP plot
+            plt.subplot(1, 2, 1)
+            plt.plot(deap_df["gen"], deap_df["avg"], label="Avg Fitness", marker="o")
+            plt.plot(deap_df["gen"], deap_df["max"], label="Max Fitness", marker="x")
+            plt.xlabel("Generation")
+            plt.ylabel("Fitness")
+            plt.title(f"DEAP Convergence - {d.stem}")
+            plt.legend()
+            # PyGAD plot
+            plt.subplot(1, 2, 2)
+            plt.plot(pygad_df["gen"], pygad_df["avg"], label="Avg Fitness", marker="o")
+            plt.plot(pygad_df["gen"], pygad_df["max"], label="Max Fitness", marker="x")
+            plt.xlabel("Generation")
+            plt.ylabel("Fitness")
+            plt.title(f"PyGAD Convergence - {d.stem}")
+            plt.legend()
 
-def gen_fitness_plots(dataset_size, dataset_name):
-    dataset_path = get_path("usage_data", dataset_size, dataset_name)
-    try:
-        deap_df = pd.read_csv(dataset_path / "DEAP_fitness_stats_log.csv")
-    except Exception as e:
-        logger.error(f"Error loading DEAP fitness stats for {dataset_name}: {e}")
-        return
-    try:
-        pygad_df = pd.read_csv(dataset_path / "PyGAD_fitness_stats_log.csv")
-    except Exception as e:
-        logger.error(f"Error loading PyGAD fitness stats for {dataset_name}: {e}")
-        return
+            plt.tight_layout()
+            figure_dir = get_path("visualisations", dataset_size, d.stem)
+            figure_dir.mkdir(parents=True, exist_ok=True)
+            filename = figure_dir / f"{d.stem}_fitness.png"
+            plt.savefig(filename, dpi=300, bbox_inches="tight")
+            plt.show()
+            plt.close()
 
-    plt.figure(figsize=(12, 5))
-    # DEAP plot
-    plt.subplot(1, 2, 1)
-    plt.plot(deap_df["gen"], deap_df["avg"], label="Avg Fitness", marker="o")
-    plt.plot(deap_df["gen"], deap_df["max"], label="Max Fitness", marker="x")
-    plt.xlabel("Generation")
-    plt.ylabel("Fitness")
-    plt.title(f"DEAP Convergence - {dataset_name}")
-    plt.legend()
-    # PyGAD plot
-    plt.subplot(1, 2, 2)
-    plt.plot(pygad_df["gen"], pygad_df["avg"], label="Avg Fitness", marker="o")
-    plt.plot(pygad_df["gen"], pygad_df["max"], label="Max Fitness", marker="x")
-    plt.xlabel("Generation")
-    plt.ylabel("Fitness")
-    plt.title(f"PyGAD Convergence - {dataset_name}")
-    plt.legend()
+def gen_usage_plots(dataset_size):
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                profile_df = pd.read_csv(d / "ga_profiling_results.csv")
+            except Exception as e:
+                logger.error(f"Error loading GA profiling results for {d.stem}: {e}")
+                return
 
-    plt.tight_layout()
-    figure_dir = get_path("visualisations", dataset_size, dataset_name)
-    figure_dir.mkdir(parents=True, exist_ok=True)
-    filename = figure_dir / f"{dataset_name}_fitness.png"
-    plt.savefig(filename, dpi=300, bbox_inches="tight")
-    plt.show()
-    plt.close()
+            plt.figure(figsize=(10, 4))
 
-def gen_usage_plots(dataset_size, dataset_name):
-    dataset_path = get_path("usage_data", dataset_size, dataset_name)
-    try:
-        profile_df = pd.read_csv(dataset_path / "ga_profiling_results.csv")
-    except Exception as e:
-        logger.error(f"Error loading GA profiling results for {dataset_name}: {e}")
-        return
+            # Runtime
+            plt.subplot(1, 2, 1)
+            plt.bar(profile_df["Algorithm"], profile_df["Runtime (s)"], color=["blue", "orange"])
+            plt.ylabel("Runtime (s)")
+            plt.title(f"Runtime Comparison\n{d.stem}")
 
-    plt.figure(figsize=(10, 4))
+            # Peak Memory
+            plt.subplot(1, 2, 2)
+            plt.bar(profile_df["Algorithm"], profile_df["Peak Memory (MB)"], color=["blue", "orange"])
+            plt.ylabel("Peak Memory (MB)")
+            plt.title(f"Memory Usage Comparison\n{d.stem}")
 
-    # Runtime
-    plt.subplot(1, 2, 1)
-    plt.bar(profile_df["Algorithm"], profile_df["Runtime (s)"], color=["blue", "orange"])
-    plt.ylabel("Runtime (s)")
-    plt.title(f"Runtime Comparison\n{dataset_name}")
-
-    # Peak Memory
-    plt.subplot(1, 2, 2)
-    plt.bar(profile_df["Algorithm"], profile_df["Peak Memory (MB)"], color=["blue", "orange"])
-    plt.ylabel("Peak Memory (MB)")
-    plt.title(f"Memory Usage Comparison\n{dataset_name}")
-
-    plt.tight_layout()
-    figure_dir = get_path("visualisations", dataset_size, dataset_name)
-    figure_dir.mkdir(parents=True, exist_ok=True)
-    filename = figure_dir / f"{dataset_name}_usage.png"
-    plt.savefig(filename, dpi=300, bbox_inches="tight")
-    plt.show()
-    plt.close()
+            plt.tight_layout()
+            figure_dir = get_path("visualisations", dataset_size, d.stem)
+            figure_dir.mkdir(parents=True, exist_ok=True)
+            filename = figure_dir / f"{d.stem}_usage.png"
+            plt.savefig(filename, dpi=300, bbox_inches="tight")
+            plt.show()
+            plt.close()
 
 
-def gen_cpu_profile_plots(dataset_size, dataset_name):
-    dataset_path = get_path("usage_data", dataset_size, dataset_name)
-    try:
-        df_deap = parse_cprofile_txt(dataset_path / "DEAP_cpu_profile.txt")
-    except Exception as e:
-        logger.error(f"Error loading DEAP CPU profile for {dataset_name}: {e}")
-        return
-    try:
-        df_pygad = parse_cprofile_txt(dataset_path / "PyGAD_cpu_profile.txt")
-    except Exception as e:
-        logger.error(f"Error loading PyGAD CPU profile for {dataset_name}: {e}")
-        return
+def gen_cpu_profile_plots(dataset_size):
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                df_deap = parse_cprofile_txt(d / "DEAP_cpu_profile.txt")
+            except Exception as e:
+                logger.error(f"Error loading DEAP CPU profile for {d.stem}: {e}")
+                return
+            try:
+                df_pygad = parse_cprofile_txt(d / "PyGAD_cpu_profile.txt")
+            except Exception as e:
+                logger.error(f"Error loading PyGAD CPU profile for {d.stem}: {e}")
+                return
 
-    plot_top_functions(df_deap, df_pygad, dataset_size, dataset_name)
+            plot_top_functions(df_deap, df_pygad, dataset_size, d.stem)
 
 def gen_aggregated_fitness_plots(dataset_size):
-    usage_dirs = [d for d in (BASE_USAGE_PATH / "usage_data" / dataset_size).iterdir() if d.is_dir()]
-    if not usage_dirs:
-        logger.error("No dataset directories found for size: " + dataset_size)
-        return
-
     # Load all fitnesses across datasets
     deap_list, pygad_list = [], []
-    for d in usage_dirs:
-        try:
-            df_deap = pd.read_csv(d / "DEAP_fitness_stats_log.csv")
-            deap_list.append(df_deap)
-        except Exception as e:
-            logger.error(f"Error loading DEAP stats from {d.name}: {e}")
-        try:
-            df_pygad = pd.read_csv(d / "PyGAD_fitness_stats_log.csv")
-            pygad_list.append(df_pygad)
-        except Exception as e:
-            logger.error(f"Error loading PyGAD stats from {d.name}: {e}")
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                df_deap = pd.read_csv(d / "DEAP_fitness_stats_log.csv")
+                deap_list.append(df_deap)
+            except Exception as e:
+                logger.error(f"Error loading DEAP stats from {d.name}: {e}")
+            try:
+                df_pygad = pd.read_csv(d / "PyGAD_fitness_stats_log.csv")
+                pygad_list.append(df_pygad)
+            except Exception as e:
+                logger.error(f"Error loading PyGAD stats from {d.name}: {e}")
 
-    if not deap_list or not pygad_list:
-        logger.error("Insufficient data for averaged fitness plots.")
-        return
+        if not deap_list or not pygad_list:
+            logger.error("Insufficient data for averaged fitness plots.")
+            return
 
     # combine all fitness results across datasets
     agg_deap = pd.concat(deap_list).groupby("gen", as_index=False).mean()
@@ -154,21 +149,15 @@ def gen_aggregated_fitness_plots(dataset_size):
     plt.close()
 
 def gen_aggregated_usage_plots(dataset_size):
-    usage_dirs = [
-        d for d in (BASE_USAGE_PATH / "usage_data" / dataset_size).iterdir()
-        if d.is_dir()
-    ]
-    if not usage_dirs:
-        logger.error("No dataset directories found for size: " + dataset_size)
-        return
-
     usage_list = []
-    for d in usage_dirs:
-        try:
-            df_usage = pd.read_csv(d / "ga_profiling_results.csv")
-            usage_list.append(df_usage)
-        except Exception as e:
-            logger.error(f"Error loading GA profiling results from {d.name}: {e}")
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                df_usage = pd.read_csv(d / "ga_profiling_results.csv")
+                usage_list.append(df_usage)
+            except Exception as e:
+                logger.error(f"Error loading GA profiling results from {d.name}: {e}")
 
     if not usage_list:
         logger.error("No GA profiling data available for aggregated usage plots.")
@@ -211,21 +200,22 @@ def gen_aggregated_usage_plots(dataset_size):
     plt.close()
 
 def gen_aggregated_cpu_profile_plots(dataset_size):
-    usage_dirs = [d for d in (BASE_USAGE_PATH / "usage_data" / dataset_size).iterdir() if d.is_dir()]
     deap_dfs, pygad_dfs = [], []
-    for d in usage_dirs:
-        try:
-            df_deap = parse_cprofile_txt(d / "DEAP_cpu_profile.txt")
-            if not df_deap.empty:
-                deap_dfs.append(df_deap)
-        except Exception as e:
-            logger.error(f"Error loading DEAP CPU profile from {d.name}: {e}")
-        try:
-            df_pygad = parse_cprofile_txt(d / "PyGAD_cpu_profile.txt")
-            if not df_pygad.empty:
-                pygad_dfs.append(df_pygad)
-        except Exception as e:
-            logger.error(f"Error loading PyGAD CPU profile from {d.name}: {e}")
+    path = get_directory("usage_data", dataset_size)
+    for d in Path(path).iterdir():
+        if d.is_dir():
+            try:
+                df_deap = parse_cprofile_txt(d / "DEAP_cpu_profile.txt")
+                if not df_deap.empty:
+                    deap_dfs.append(df_deap)
+            except Exception as e:
+                logger.error(f"Error loading DEAP CPU profile from {d.name}: {e}")
+            try:
+                df_pygad = parse_cprofile_txt(d / "PyGAD_cpu_profile.txt")
+                if not df_pygad.empty:
+                    pygad_dfs.append(df_pygad)
+            except Exception as e:
+                logger.error(f"Error loading PyGAD CPU profile from {d.name}: {e}")
 
     if not deap_dfs and not pygad_dfs:
         logger.error("No CPU profile data available for aggregated CPU plots.")

@@ -46,18 +46,23 @@ def on_generation(ga_instance):
     later down the line.  
 '''
 
-def run_ga(df):
+def run_ga(df,
+    num_generations=50,
+    num_parents_mating=15,
+    sol_per_pop=100,
+    mutation_probability=0.08,
+    crossover_probability=0.7,
+    mutation_type="inversion",
+    crossover_type="single_point",
+    parent_selection_type="tournament",
+    K_tournament=3,
+    ):
     # Train-test split
     y = df["target"].values
     X = df.drop("target", axis=1).values
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=932024)
 
-    # GA parameters
-    num_generations = 50
-    num_parents_mating = 15
-    sol_per_pop = 100
     num_genes = X_train.shape[1]
-    mutation_probability = 0.08
 
     # Fitness function
     def fitness_function(ga_instance, solution, solution_idx):
@@ -70,29 +75,20 @@ def run_ga(df):
             logger.error(f"Error in pygad fitness function at index {solution_idx}: {e}")
             return np.nan,
 
-    # Attempting to have as similar to the DEAP implementation. Might refactor both to ensure consistency. The commented
-    # sections require some revisiting as they differ slightly to the DEAP tester.
     ga_instance = pygad.GA(
         num_generations=num_generations,
         num_parents_mating=num_parents_mating,
-        # This is a slight issue. DEAP doesn't seem to have an equivalent parameter.
         fitness_func=fitness_function,
         sol_per_pop=sol_per_pop,
         num_genes=num_genes,
         init_range_low=-1.0,
         init_range_high=1.0,
         mutation_probability=mutation_probability,
-        crossover_probability=0.7,
-        mutation_type="inversion",
-        # Current DEAP implementation uses Inversion mutation. Possible options here are: random,
-        # swap, inversion, scramble and adaptive.
-        crossover_type="single_point",
-        # Current DEAP implementation uses cxBlend. Possible options here are: single-point,
-        # two-points, uniform and scattered.
-        parent_selection_type="tournament",
-        # Changed to tournament as this way I can better control the behaviour of both
-        # libraries
-        K_tournament=3,
+        crossover_probability=crossover_probability,
+        mutation_type=mutation_type,
+        crossover_type=crossover_type,
+        parent_selection_type=parent_selection_type,
+        K_tournament=K_tournament,
         on_generation=on_generation,
     )
 
