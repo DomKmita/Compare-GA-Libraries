@@ -6,7 +6,7 @@ import pathlib
 def main():
     # Run algorithms and save data
     size = "small"
-    usage.run_GAs_and_gen_data(size=size, num_runs=3)
+    usage.run_GAs_and_gen_data(dataset_size=size, num_runs=3)
 
     #Create visualisations from the data
     vg.gen_usage_plots(size)

@@ -5,7 +5,7 @@ import io
 import numpy as np
 import pandas as pd
 from memory_profiler import memory_usage
-from utils.utils import logger, BASE_PATH, get_root, get_directory
+from utils.utils import logger, get_root, get_directory
 from pathlib import Path
 
 from deap import  tools
@@ -78,8 +78,8 @@ def save_data(ga_name, directory_label, profiling_stats, memory_and_runtime_stat
     except Exception as e:
         logger.error(f"Failed to save memory and runtime data: {e}")
 
-def run_GAs_and_gen_data(size="small", num_runs=3):
-    for p in Path(BASE_PATH / f'datasets/{size}').iterdir():
+def run_GAs_and_gen_data(dataset_size="small", num_runs=3):
+    for p in Path(get_directory("datasets", dataset_size)).iterdir():
         if p.is_file() and p.suffix == '.csv':
             try:
                 df = pd.read_csv(p)
@@ -240,7 +240,7 @@ def test_mutation_experiments(dataset_size="small"):
         "adaptive": {"mutation_type": "adaptive", "mutation_probability": [0.08, 0.08]}  # Uses an adaptive scheme for mutation rates.
     }
 
-    for p in Path(BASE_PATH / f'datasets/{dataset_size}').iterdir():
+    for p in Path(get_directory("datasets", dataset_size)).iterdir():
         if p.is_file() and p.suffix == '.csv':
             df = pd.read_csv(p)
             dataset_name = p.stem
@@ -334,7 +334,7 @@ def test_crossover_experiments(dataset_size="small"):
         },
     }
 
-    for p in Path(BASE_PATH / f'datasets/{dataset_size}').iterdir():
+    for p in Path(get_directory("datasets", dataset_size)).iterdir():
         if p.is_file() and p.suffix == '.csv':
             df = pd.read_csv(p)
             dataset_name = p.stem
@@ -406,7 +406,7 @@ def test_selection_experiments(dataset_size="small"):
         "sus": {"parent_selection_type": "sus"},  # stochastic universal sampling
     }
 
-    for p in Path(BASE_PATH / f'datasets/{dataset_size}').iterdir():
+    for p in Path(get_directory("datasets", dataset_size)).iterdir():
         if p.is_file() and p.suffix == '.csv':
             df = pd.read_csv(p)
             dataset_name = p.stem
@@ -511,7 +511,7 @@ def test_deap_algorithm_experiments(dataset_size="small"):
         },
     }
 
-    for p in Path(BASE_PATH / f'datasets/{dataset_size}').iterdir():
+    for p in Path(get_directory("datasets", dataset_size)).iterdir():
         if p.is_file() and p.suffix == '.csv':
             df = pd.read_csv(p)
             dataset_name = p.stem
