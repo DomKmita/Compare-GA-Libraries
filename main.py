@@ -1,3 +1,4 @@
+from datasets import dataset_generator
 from usage_data import usage_tracking_script as usage
 from visualisations import visualisation_generator as vg
 from usage_data import xlsx_table_generator as tg
@@ -6,6 +7,8 @@ import pathlib
 def main():
     # Run algorithms and save data
     size = "small"
+
+    # Generate usage data
     usage.run_GAs_and_gen_data(dataset_size=size, num_runs=3)
 
     #Create visualisations from the data

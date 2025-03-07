@@ -2,7 +2,8 @@ from sklearn.datasets import make_classification
 from scipy.sparse import csr_matrix
 import pandas as pd
 import numpy as np
-from utils.logger import logger
+from pathlib import Path
+from utils.utils import logger, get_directory
 
 # Function to generate datasets with specified parameters
 # Make classification is used as it allows for greater control
@@ -84,12 +85,13 @@ datasetTypeMap = {
     # by default.
     }
 
-def generate_datasets():
+def generate_datasets(size="small"):
+    sizes = {"small": 1000, "medium": 50000, "large": 500000}
     for label, dataset_type in datasetTypeMap.items():
         try:
             # keeping sample size static for now. Once data is analysed I'll see what data properties to test for at larger
             # dataset sizes
-            X, y = generate_dataset(10000, n_features = dataset_type[0], n_classes = dataset_type[1],
+            X, y = generate_dataset(sizes[size], n_features = dataset_type[0], n_classes = dataset_type[1],
                                     informative = dataset_type[2], redundant = dataset_type[3],weights = dataset_type[4],
                                     separability = dataset_type[5], outliers = dataset_type[6], feature_type = dataset_type[7])
 
@@ -105,8 +107,9 @@ def generate_datasets():
             df['target'] = y
 
             # Save to CSV
-            df.to_csv(f"small_dataset_{label}.csv", index=False)
-            print(f"Dataset_{label} saved as small_dataset_{label}.csv")
+            path = get_directory("datasets", size)
+            df.to_csv(f"{path}/{size}_dataset_{label}.csv", index=False)
+            print(f"Dataset_{label} saved as {size}_dataset_{label}.csv")
         except Exception as e:
             logger.error(f"Failed to generate dataset_{label}: {e}")
 

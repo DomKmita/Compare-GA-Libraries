@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import pygad
 import traceback
-from utils.logger import logger
+from utils.utils import logger
 
 """
     Callback function to track average & max fitness per generation.

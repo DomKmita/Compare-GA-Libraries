@@ -5,7 +5,7 @@ from pathlib import Path
 from deap import base, creator, tools, algorithms
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from utils.logger import logger
+from utils.utils import logger
 
 # Run the genetic algorithm
 def run_ga( df,
